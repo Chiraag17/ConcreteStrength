@@ -1,0 +1,5 @@
+{
+  "name": "Concrete Strength AI Lab",
+  "description": "Interactive PCA, Variance Analysis & Regression Prediction Simulator for the UCI Concrete Compressive Strength dataset.",
+  "requestFramePermissions": []
+}
