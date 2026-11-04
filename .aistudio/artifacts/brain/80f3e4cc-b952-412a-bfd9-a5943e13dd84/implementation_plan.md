@@ -1,26 +1,32 @@
-# Runtime & TypeScript Error Fix Plan — Concrete Strength AI Lab
+# Left Sidebar Navigation Plan — Concrete Strength AI Lab
 
-## Root Cause Identified
-During the UI simplification refactor, several component props referenced shorthand property names that did not match the exact data structures returned by `runConcreteMLPipeline` and `predictConcreteStrength` in `mlEngine.ts`, causing runtime `TypeError: Cannot read properties of undefined` crashes when rendering:
+## Goal
+Move the 4 navigation tabs (**1. Dataset & Scaling**, **2. PCA Simulator**, **3. Regression Comparison**, **4. Strength Predictor**) from the top horizontal bar into a clean, fixed **left sidebar** so they never clip or require horizontal scrolling.
 
-1. **Dataset & Overview Properties**:
-   - `pipeline.totalRecords` → should be `pipeline.totalRows`
-   - `f.label` / `f.shortLabel` → should be `f.name` / `f.shortName` (from `FeatureMeta` & `TARGET_METADATA`)
-   - `pipeline.rawDistributions[i]` → should be `pipeline.columnStats[i].histogram`
-2. **Normalization Properties**:
-   - `pipeline.scaler.normalizedDistributions[i]` → should use `.bins` (`{ binCenter, label, count }[]`)
-   - `pipeline.scaler.sampleComparisons` → should be `pipeline.scaler.sampleTransformations`
-3. **PCA Simulator Properties**:
-   - `dimensionalityReductionPct` → should be `dimensionalityReductionPercent`
-   - `pipeline.pca.weightedContributionsByK` → should be `pipeline.pca.featureImportanceByK`
-   - `pipeline.pca.projected2D` → should be `pipeline.pca.projectedSamples` (`pcCoords[0]`, `pcCoords[1]`, `actualStrength`)
-4. **Regression & Predictor Properties**:
-   - `model.testPoints` → should map `pipeline.regression.testActuals` with `model.testPredictions`
-   - `CONCRETE_MIX_PRESETS[i].values` → should be `CONCRETE_MIX_PRESETS[i].ingredients`
-   - `prediction.predictedWithoutPCA` / `predictedWithPCA` → should be `prediction.predWithoutPCA` / `predWithPCA`
-5. **Strict TypeScript Check in `mlEngine.ts`**:
-   - Explicitly type the identity matrix `V` in `eigenDecompositionSymmetric` as `number[][]` so `tsc --noEmit` passes with zero warnings or errors.
+---
 
-## Verification
-- Run `lint_applet` (`tsc --noEmit`) to guarantee zero TypeScript or property mismatches across the entire codebase.
-- Run `compile_applet` (`vite build`) and verify the dev server responds cleanly on port 3000.
+## Layout Update
+
+```
+┌──────────────────────────┬───────────────────────────────────────────────┐
+│ Concrete Strength AI Lab │  Active Section Header                        │
+│ PCA & Regression Lab     ├───────────────────────────────────────────────┤
+├──────────────────────────┤                                               │
+│                          │                                               │
+│ ● 1. Dataset & Scaling   │                                               │
+│                          │         Main Interactive Content              │
+│ ● 2. PCA Simulator       │        (Spacious, Full-Width Cards)           │
+│                          │                                               │
+│ ● 3. Regression Compare  │                                               │
+│                          │                                               │
+│ ● 4. Strength Predictor  │                                               │
+│                          │                                               │
+├──────────────────────────┤                                               │
+│ Active PCA: k = 6 / 8    │                                               │
+│ Variance: 97.31%         │                                               │
+└──────────────────────────┴───────────────────────────────────────────────┘
+```
+
+- **Clean Left Sidebar**: Displays the app title, subtitle, the 4 vertically stacked navigation tabs with icons, and a compact PCA status card at the bottom.
+- **No Horizontal Scrollbar**: Eliminates the clipped horizontal tab pill container shown in your screenshot.
+- **Mobile Friendly**: Includes a clean top menu toggle for smaller screens while keeping the fixed left sidebar on desktop.

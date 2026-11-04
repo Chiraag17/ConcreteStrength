@@ -1,6 +1,6 @@
 {
-  "summary": "Plan to fix runtime TypeErrors and TypeScript property mismatches across the simplified components and verify with tsc --noEmit and Vite build.",
-  "updatedAt": "2026-11-04T16:29:42.026147213Z",
+  "summary": "Plan to move the 4 navigation tabs (1. Dataset & Scaling, 2. PCA Simulator, 3. Regression Comparison, 4. Strength Predictor) into a clean left sidebar so they never scroll horizontally or get cut off.",
+  "updatedAt": "2026-11-04T18:00:26.829824375Z",
   "requestFeedback": true,
   "userFacing": true
 }
