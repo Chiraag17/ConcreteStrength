@@ -97,6 +97,7 @@ export interface MLPipelineResult {
     componentsFor95: number; // n = 6
     featureImportanceByK: Record<number, FeatureImportanceItem[]>; // k = 1..8
     projectedSamples: ProjectedSample[];
+    trainTransformedHead: number[][]; // First 10 rows of X_train_pca (PC1..PC8) matching Cell 15 pca_df.head()
   };
   regression: {
     withoutPCA: RegressionModelResult;
@@ -821,6 +822,7 @@ export function runConcreteMLPipeline(
       componentsFor95,
       featureImportanceByK,
       projectedSamples,
+      trainTransformedHead: PC_train_all.slice(0, 10),
     },
     regression: {
       withoutPCA,

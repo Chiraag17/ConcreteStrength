@@ -8,11 +8,12 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
-  LineChart,
-  Line,
+  BarChart,
+  Bar,
+  Cell,
   Legend,
 } from 'recharts';
-import { GitCompare, CheckCircle2 } from 'lucide-react';
+import { GitCompare, Table2, BarChart3, Award } from 'lucide-react';
 import { MLPipelineResult } from '../ml/mlEngine';
 
 interface RegressionComparisonSectionProps {
@@ -29,24 +30,97 @@ export const RegressionComparisonSection: React.FC<RegressionComparisonSectionPr
   const modelA = pipeline.regression.withoutPCA;
   const modelB = pipeline.regression.withPCAByK[selectedK];
 
-  const kSeriesData = useMemo(() => {
-    return [1, 2, 3, 4, 5, 6, 7, 8].map((k) => {
-      const m = pipeline.regression.withPCAByK[k];
-      return {
-        kLabel: `${k} PC${k > 1 ? 's' : ''}`,
-        k,
-        r2WithPCA: Number(m.r2.toFixed(4)),
-        rmseWithPCA: Number(m.rmse.toFixed(2)),
-        retainedPct: Number((m.retainedVarianceRatio * 100).toFixed(1)),
-      };
-    });
-  }, [pipeline.regression]);
+  // Cell 18: Model Performance Matrix rows
+  const performanceMatrixRows = useMemo(
+    () => [
+      {
+        metric: 'Input features',
+        withoutPCA: modelA.featuresCount.toFixed(0),
+        withPCA: modelB.featuresCount.toFixed(0),
+        diff: `${modelB.featuresCount - modelA.featuresCount} features`,
+      },
+      {
+        metric: 'Variance retained (%)',
+        withoutPCA: (modelA.retainedVarianceRatio * 100).toFixed(4),
+        withPCA: (modelB.retainedVarianceRatio * 100).toFixed(4),
+        diff: `${((modelB.retainedVarianceRatio - 1) * 100).toFixed(2)}%`,
+      },
+      {
+        metric: 'MAE (Mean Absolute Error)',
+        withoutPCA: modelA.mae.toFixed(4),
+        withPCA: modelB.mae.toFixed(4),
+        diff: `${modelB.mae >= modelA.mae ? '+' : ''}${(modelB.mae - modelA.mae).toFixed(4)}`,
+      },
+      {
+        metric: 'MSE (Mean Squared Error)',
+        withoutPCA: modelA.mse.toFixed(4),
+        withPCA: modelB.mse.toFixed(4),
+        diff: `${modelB.mse >= modelA.mse ? '+' : ''}${(modelB.mse - modelA.mse).toFixed(4)}`,
+      },
+      {
+        metric: 'RMSE (Root Mean Squared Error)',
+        withoutPCA: modelA.rmse.toFixed(4),
+        withPCA: modelB.rmse.toFixed(4),
+        diff: `${modelB.rmse >= modelA.rmse ? '+' : ''}${(modelB.rmse - modelA.rmse).toFixed(4)}`,
+      },
+      {
+        metric: 'R2 Score',
+        withoutPCA: modelA.r2.toFixed(4),
+        withPCA: modelB.r2.toFixed(4),
+        diff: `${modelB.r2 >= modelA.r2 ? '+' : ''}${(modelB.r2 - modelA.r2).toFixed(4)}`,
+      },
+    ],
+    [modelA, modelB]
+  );
+
+  // Cell 19: 2x2 Subplots data for MAE, MSE, RMSE, R2 Score
+  const metricSubplots = useMemo(
+    () => [
+      {
+        key: 'mae',
+        title: 'MAE (Mean Absolute Error)',
+        subtitle: 'Lower is better (MPa)',
+        data: [
+          { model: 'Without PCA', value: Number(modelA.mae.toFixed(3)), color: '#10b981' },
+          { model: `With PCA (k=${selectedK})`, value: Number(modelB.mae.toFixed(3)), color: '#06b6d4' },
+        ],
+      },
+      {
+        key: 'mse',
+        title: 'MSE (Mean Squared Error)',
+        subtitle: 'Lower is better (MPa²)',
+        data: [
+          { model: 'Without PCA', value: Number(modelA.mse.toFixed(3)), color: '#10b981' },
+          { model: `With PCA (k=${selectedK})`, value: Number(modelB.mse.toFixed(3)), color: '#06b6d4' },
+        ],
+      },
+      {
+        key: 'rmse',
+        title: 'RMSE (Root Mean Squared Error)',
+        subtitle: 'Lower is better (MPa)',
+        data: [
+          { model: 'Without PCA', value: Number(modelA.rmse.toFixed(3)), color: '#10b981' },
+          { model: `With PCA (k=${selectedK})`, value: Number(modelB.rmse.toFixed(3)), color: '#06b6d4' },
+        ],
+      },
+      {
+        key: 'r2',
+        title: 'R2 Score (Coefficient of Determination)',
+        subtitle: 'Higher is better (max 1.0)',
+        data: [
+          { model: 'Without PCA', value: Number(modelA.r2.toFixed(4)), color: '#10b981' },
+          { model: `With PCA (k=${selectedK})`, value: Number(modelB.r2.toFixed(4)), color: '#06b6d4' },
+        ],
+      },
+    ],
+    [modelA, modelB, selectedK]
+  );
 
   const scatterDataA = useMemo(
     () =>
       pipeline.regression.testActuals.map((actual, idx) => ({
-        actual: Number(actual.toFixed(1)),
-        predicted: Number((modelA.testPredictions[idx] ?? 0).toFixed(1)),
+        actual: Number(actual.toFixed(2)),
+        predicted: Number((modelA.testPredictions[idx] ?? 0).toFixed(2)),
       })),
     [pipeline.regression.testActuals, modelA.testPredictions]
   );
@@ -54,25 +128,25 @@ export const RegressionComparisonSection: React.FC<RegressionComparisonSectionPr
   const scatterDataB = useMemo(
     () =>
       pipeline.regression.testActuals.map((actual, idx) => ({
-        actual: Number(actual.toFixed(1)),
-        predicted: Number((modelB.testPredictions[idx] ?? 0).toFixed(1)),
+        actual: Number(actual.toFixed(2)),
+        predicted: Number((modelB.testPredictions[idx] ?? 0).toFixed(2)),
       })),
     [pipeline.regression.testActuals, modelB.testPredictions]
   );
 
   return (
     <div className="space-y-6">
-      {/* Side-by-Side Comparison Header Card */}
+      {/* Part 1: Model Performance Matrix Table (Cells 16, 17, 18) */}
       <div className="rounded-2xl bg-slate-900/85 border border-slate-800 p-6 space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
-            <GitCompare className="w-5 h-5 text-cyan-400" />
+            <Table2 className="w-5 h-5 text-cyan-400" />
             <div>
               <h2 className="text-xl font-bold text-white">
-                Regression Without PCA vs. With PCA
+                1. Model Performance Matrix (Without PCA vs. With PCA)
               </h2>
               <p className="text-xs text-slate-400">
-                Comparing Linear Regression accuracy on the 206 unseen test samples
+                Exact <span className="font-mono text-cyan-300">results</span> DataFrame comparing Linear Regression on 206 test samples
               </p>
             </div>
           </div>
@@ -97,184 +171,120 @@ export const RegressionComparisonSection: React.FC<RegressionComparisonSectionPr
           </div>
         </div>
 
-        {/* Two Clean Scoreboard Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="rounded-xl bg-slate-950/90 border border-emerald-500/35 p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
-                Model A: Without PCA (All 8 Features)
-              </span>
-              <span className="text-xs font-mono text-slate-400">100% Variance</span>
-            </div>
-            <div className="grid grid-cols-4 gap-2 font-mono pt-1">
-              <div>
-                <div className="text-[11px] text-slate-500">R² Score</div>
-                <div className="text-xl font-bold text-emerald-300">{modelA.r2.toFixed(4)}</div>
-              </div>
-              <div>
-                <div className="text-[11px] text-slate-500">RMSE</div>
-                <div className="text-xl font-bold text-white">{modelA.rmse.toFixed(2)}</div>
-              </div>
-              <div>
-                <div className="text-[11px] text-slate-500">MAE</div>
-                <div className="text-xl font-bold text-slate-200">{modelA.mae.toFixed(2)}</div>
-              </div>
-              <div>
-                <div className="text-[11px] text-slate-500">MSE</div>
-                <div className="text-xl font-bold text-slate-300">{modelA.mse.toFixed(1)}</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-xl bg-slate-950/90 border border-cyan-500/35 p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-cyan-400">
-                Model B: With PCA (k = {selectedK} Components)
-              </span>
-              <span className="text-xs font-mono text-cyan-300">
-                {(modelB.retainedVarianceRatio * 100).toFixed(2)}% Variance
-              </span>
-            </div>
-            <div className="grid grid-cols-4 gap-2 font-mono pt-1">
-              <div>
-                <div className="text-[11px] text-slate-500">R² Score</div>
-                <div className="text-xl font-bold text-cyan-300">{modelB.r2.toFixed(4)}</div>
-              </div>
-              <div>
-                <div className="text-[11px] text-slate-500">RMSE</div>
-                <div className="text-xl font-bold text-white">{modelB.rmse.toFixed(2)}</div>
-              </div>
-              <div>
-                <div className="text-[11px] text-slate-500">MAE</div>
-                <div className="text-xl font-bold text-slate-200">{modelB.mae.toFixed(2)}</div>
-              </div>
-              <div>
-                <div className="text-[11px] text-slate-500">MSE</div>
-                <div className="text-xl font-bold text-slate-300">{modelB.mse.toFixed(1)}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Simple Takeaway Box */}
-        <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 text-xs sm:text-sm text-slate-300 flex items-start gap-2.5">
-          <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-          <div>
-            <strong className="text-white">Why does PCA at k = 6 have a slightly lower R² (0.5679 vs 0.6275)?</strong>{' '}
-            PCA only looks at ingredient variance, not the target strength. Even though PC7 and PC8
-            hold only <strong>2.69%</strong> of variance, they still carry useful information for
-            predicting strength. Selecting <strong>k = 7</strong> recovers almost full accuracy (
-            <strong className="text-emerald-300 font-mono">R² = 0.6255</strong>).
-          </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs font-mono border-collapse">
+            <thead>
+              <tr className="border-b border-slate-800 text-slate-400">
+                <th className="py-2.5 px-4 text-left font-sans">Evaluation Metric</th>
+                <th className="py-2.5 px-4 text-right text-emerald-300">Without PCA</th>
+                <th className="py-2.5 px-4 text-right text-cyan-300">
+                  With PCA (k = {selectedK})
+                </th>
+                <th className="py-2.5 px-4 text-right text-slate-400">Difference</th>
+              </tr>
+            </thead>
+            <tbody>
+              {performanceMatrixRows.map((row) => (
+                <tr
+                  key={row.metric}
+                  className="border-b border-slate-800/60 hover:bg-slate-800/40"
+                >
+                  <td className="py-2.5 px-4 font-sans font-semibold text-slate-200">
+                    {row.metric}
+                  </td>
+                  <td className="py-2.5 px-4 text-right text-emerald-300 font-bold">
+                    {row.withoutPCA}
+                  </td>
+                  <td className="py-2.5 px-4 text-right text-cyan-300 font-bold">
+                    {row.withPCA}
+                  </td>
+                  <td className="py-2.5 px-4 text-right text-slate-400">{row.diff}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      {/* Charts: R² vs PCs & RMSE vs PCs */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="rounded-2xl bg-slate-900/80 border border-slate-800 p-6 space-y-4">
+      {/* Part 2: 2x2 Regression Performance Comparison Bar Charts (Cell 19) */}
+      <div className="rounded-2xl bg-slate-900/80 border border-slate-800 p-6 space-y-5">
+        <div className="flex items-center gap-2.5">
+          <BarChart3 className="w-5 h-5 text-cyan-400" />
           <div>
-            <h3 className="text-base font-bold text-white">
-              1. R² Score vs. Number of Principal Components
+            <h3 className="text-lg font-bold text-white">
+              2. Regression Performance Comparison (2×2 Metric Subplots)
             </h3>
             <p className="text-xs text-slate-400">
-              Higher is better. Green dashed line = Without PCA (0.6275)
+              Visualizing <span className="font-mono text-cyan-300">MAE</span>,{' '}
+              <span className="font-mono text-cyan-300">MSE</span>,{' '}
+              <span className="font-mono text-cyan-300">RMSE</span>, and{' '}
+              <span className="font-mono text-cyan-300">R2 Score</span> side by side
             </p>
-          </div>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={kSeriesData} margin={{ top: 10, right: 20, left: -10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="kLabel" tick={{ fill: '#cbd5e1', fontSize: 11 }} />
-                <YAxis domain={[0, 0.75]} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#0f172a',
-                    borderColor: '#334155',
-                    borderRadius: '0.75rem',
-                    fontSize: '12px',
-                  }}
-                />
-                <ReferenceLine
-                  y={Number(modelA.r2.toFixed(4))}
-                  stroke="#10b981"
-                  strokeDasharray="5 5"
-                  label={{
-                    value: 'Without PCA (0.6275)',
-                    fill: '#10b981',
-                    fontSize: 11,
-                    position: 'insideBottomRight',
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="r2WithPCA"
-                  name="PCA R² Score"
-                  stroke="#06b6d4"
-                  strokeWidth={3}
-                  dot={{ r: 5, fill: '#06b6d4' }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
           </div>
         </div>
 
-        <div className="rounded-2xl bg-slate-900/80 border border-slate-800 p-6 space-y-4">
-          <div>
-            <h3 className="text-base font-bold text-white">
-              2. Prediction Error (RMSE) vs. Principal Components
-            </h3>
-            <p className="text-xs text-slate-400">
-              Lower error is better. Green dashed line = Without PCA (9.80 MPa)
-            </p>
-          </div>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={kSeriesData} margin={{ top: 10, right: 20, left: -10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="kLabel" tick={{ fill: '#cbd5e1', fontSize: 11 }} />
-                <YAxis domain={[9, 17]} unit=" MPa" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#0f172a',
-                    borderColor: '#334155',
-                    borderRadius: '0.75rem',
-                    fontSize: '12px',
-                  }}
-                />
-                <ReferenceLine
-                  y={Number(modelA.rmse.toFixed(2))}
-                  stroke="#10b981"
-                  strokeDasharray="5 5"
-                  label={{
-                    value: 'Without PCA (9.80 MPa)',
-                    fill: '#10b981',
-                    fontSize: 11,
-                    position: 'insideTopRight',
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="rmseWithPCA"
-                  name="PCA RMSE (MPa)"
-                  stroke="#f43f5e"
-                  strokeWidth={3}
-                  dot={{ r: 5, fill: '#f43f5e' }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {metricSubplots.map((subplot) => (
+            <div
+              key={subplot.key}
+              className="rounded-xl bg-slate-950/85 border border-slate-800 p-4 space-y-3"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-bold text-white">{subplot.title}</h4>
+                  <p className="text-[11px] text-slate-400">{subplot.subtitle}</p>
+                </div>
+                <div className="text-right font-mono text-xs">
+                  <span className="text-emerald-300 mr-2">
+                    No PCA: {subplot.data[0].value}
+                  </span>
+                  <span className="text-cyan-300">PCA: {subplot.data[1].value}</span>
+                </div>
+              </div>
+
+              <div className="h-44">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={subplot.data}
+                    margin={{ top: 10, right: 15, left: -10, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                    <XAxis dataKey="model" tick={{ fill: '#cbd5e1', fontSize: 11 }} />
+                    <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#0f172a',
+                        borderColor: '#334155',
+                        borderRadius: '0.75rem',
+                        fontSize: '12px',
+                      }}
+                    />
+                    <Bar dataKey="value" name={subplot.title} radius={[6, 6, 0, 0]} barSize={56}>
+                      {subplot.data.map((entry, idx) => (
+                        <Cell key={`cell-${idx}`} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Actual vs Predicted Scatterplot */}
+      {/* Part 3: Actual vs. Predicted Concrete Strength Scatter Plot (Cell 21) */}
       <div className="rounded-2xl bg-slate-900/80 border border-slate-800 p-6 space-y-4">
-        <div>
-          <h3 className="text-base font-bold text-white">
-            3. Actual vs. Predicted Concrete Strength (Test Set)
-          </h3>
-          <p className="text-xs text-slate-400">
-            Points closer to the dashed diagonal line indicate more accurate predictions
-          </p>
+        <div className="flex items-center gap-2.5">
+          <GitCompare className="w-5 h-5 text-emerald-400" />
+          <div>
+            <h3 className="text-lg font-bold text-white">
+              3. Regression Comparison: Actual vs. Predicted Concrete Strength
+            </h3>
+            <p className="text-xs text-slate-400">
+              Comparing <span className="text-emerald-300 font-semibold">Without PCA</span> and{' '}
+              <span className="text-cyan-300 font-semibold">With PCA (k = {selectedK})</span> against the dashed Perfect Prediction diagonal
+            </p>
+          </div>
         </div>
         <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
@@ -283,7 +293,7 @@ export const RegressionComparisonSection: React.FC<RegressionComparisonSectionPr
               <XAxis
                 type="number"
                 dataKey="actual"
-                name="Actual"
+                name="Actual Strength"
                 domain={[0, 85]}
                 unit=" MPa"
                 tick={{ fill: '#94a3b8', fontSize: 11 }}
@@ -291,7 +301,7 @@ export const RegressionComparisonSection: React.FC<RegressionComparisonSectionPr
               <YAxis
                 type="number"
                 dataKey="predicted"
-                name="Predicted"
+                name="Predicted Strength"
                 domain={[0, 85]}
                 unit=" MPa"
                 tick={{ fill: '#94a3b8', fontSize: 11 }}
@@ -310,11 +320,17 @@ export const RegressionComparisonSection: React.FC<RegressionComparisonSectionPr
                   { x: 0, y: 0 },
                   { x: 85, y: 85 },
                 ]}
-                stroke="#94a3b8"
-                strokeDasharray="4 4"
+                stroke="#f8fafc"
+                strokeDasharray="5 5"
+                label={{
+                  value: 'Perfect Prediction',
+                  fill: '#cbd5e1',
+                  fontSize: 11,
+                  position: 'insideTopLeft',
+                }}
               />
               <Scatter
-                name="Without PCA (8 Features)"
+                name="Without PCA"
                 data={scatterDataA}
                 fill="#10b981"
                 opacity={0.7}
@@ -327,6 +343,63 @@ export const RegressionComparisonSection: React.FC<RegressionComparisonSectionPr
               />
             </ScatterChart>
           </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Part 4: Final Results Summary (Cell 23) */}
+      <div className="rounded-2xl bg-slate-900/90 border border-cyan-500/35 p-6 space-y-4">
+        <div className="flex items-center gap-2.5">
+          <Award className="w-5 h-5 text-cyan-400" />
+          <div>
+            <h3 className="text-lg font-bold text-white">
+              4. Final Results Summary
+            </h3>
+            <p className="text-xs text-slate-400">
+              Console output from the final cell of <span className="font-mono text-cyan-300">Concrete.ipynb</span>
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs">
+          <div className="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800">
+            <div className="text-slate-400 text-[11px]">Original → Selected PCs</div>
+            <div className="text-lg font-bold text-white mt-0.5">
+              8 → {selectedK}
+            </div>
+            <div className="text-[11px] text-purple-300 mt-0.5">
+              Dim Reduction: {modelB.dimensionalityReductionPercent.toFixed(1)}%
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800">
+            <div className="text-slate-400 text-[11px]">Variance Retained</div>
+            <div className="text-lg font-bold text-cyan-300 mt-0.5">
+              {(modelB.retainedVarianceRatio * 100).toFixed(2)}%
+            </div>
+            <div className="text-[11px] text-slate-500 mt-0.5">
+              Target: ≥95.0%
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800">
+            <div className="text-slate-400 text-[11px]">RMSE (No PCA vs PCA)</div>
+            <div className="text-lg font-bold text-white mt-0.5">
+              {modelA.rmse.toFixed(4)} vs {modelB.rmse.toFixed(4)}
+            </div>
+            <div className="text-[11px] text-slate-500 mt-0.5">Root Mean Squared Error</div>
+          </div>
+
+          <div className="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800">
+            <div className="text-slate-400 text-[11px]">R² (No PCA vs PCA)</div>
+            <div className="text-lg font-bold text-emerald-300 mt-0.5">
+              {modelA.r2.toFixed(4)} vs <span className="text-cyan-300">{modelB.r2.toFixed(4)}</span>
+            </div>
+            <div className="text-[11px] text-slate-500 mt-0.5">
+              {modelB.r2 >= modelA.r2
+                ? 'PCA maintained/improved accuracy'
+                : 'PCA reduced regression accuracy'}
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
 import {
-  BarChart,
   Bar,
   Line,
   XAxis,
@@ -10,11 +9,9 @@ import {
   ResponsiveContainer,
   ReferenceLine,
   Cell,
-  ScatterChart,
-  Scatter,
   ComposedChart,
 } from 'recharts';
-import { Sliders, CheckCircle2 } from 'lucide-react';
+import { Sliders, Table2, Sigma, Layers } from 'lucide-react';
 import { MLPipelineResult } from '../ml/mlEngine';
 
 interface PCASimulatorSectionProps {
@@ -30,13 +27,15 @@ export const PCASimulatorSection: React.FC<PCASimulatorSectionProps> = ({
 }) => {
   const currentKMetrics = pipeline.regression.withPCAByK[selectedK];
   const retainedPct = currentKMetrics.retainedVarianceRatio * 100;
-  const lostPct = currentKMetrics.lostVarianceRatio * 100;
+  const dimsReduced = 8 - selectedK;
   const dimRedPct = currentKMetrics.dimensionalityReductionPercent;
 
-  const varianceChartData = useMemo(() => {
+  // Cell 8 & 9: variance_table data
+  const varianceTableData = useMemo(() => {
     return pipeline.pca.explainedVarianceRatio.map((ratio, idx) => {
       const pcNum = idx + 1;
       return {
+        pcNum,
         pc: `PC${pcNum}`,
         individualPct: Number((ratio * 100).toFixed(2)),
         cumulativePct: Number((pipeline.pca.cumulativeVarianceRatio[idx] * 100).toFixed(2)),
@@ -45,47 +44,32 @@ export const PCASimulatorSection: React.FC<PCASimulatorSectionProps> = ({
     });
   }, [pipeline.pca, selectedK]);
 
-  const weightedContributions = useMemo(() => {
-    const items = pipeline.pca.featureImportanceByK[selectedK] || [];
-    return items.map((item) => ({
-      name: item.shortName,
-      score: Number(item.importance.toFixed(4)),
-      sharePct: Number(item.sharePercent.toFixed(1)),
-    }));
-  }, [pipeline.pca.featureImportanceByK, selectedK]);
+  // Cell 13 & 14: PCA Component Coefficients & Mathematical Equations for PC1..PC(selectedK)
+  const selectedComponents = useMemo(
+    () => pipeline.pca.components.slice(0, selectedK),
+    [pipeline.pca.components, selectedK]
+  );
 
-  const scatterBuckets = useMemo(() => {
-    const low: { pc1: number; pc2: number; strength: number }[] = [];
-    const mid: { pc1: number; pc2: number; strength: number }[] = [];
-    const high: { pc1: number; pc2: number; strength: number }[] = [];
-
-    pipeline.pca.projectedSamples.forEach((pt) => {
-      const item = {
-        pc1: Number(pt.pcCoords[0].toFixed(2)),
-        pc2: Number(pt.pcCoords[1].toFixed(2)),
-        strength: Number(pt.actualStrength.toFixed(1)),
-      };
-      if (pt.actualStrength < 25) low.push(item);
-      else if (pt.actualStrength <= 45) mid.push(item);
-      else high.push(item);
-    });
-    return { low, mid, high };
-  }, [pipeline.pca.projectedSamples]);
+  // Cell 15: First 5 rows of PCA Transformed Dataset (pca_df.head())
+  const pcaHeadRows = useMemo(
+    () => (pipeline.pca.trainTransformedHead || []).slice(0, 5),
+    [pipeline.pca.trainTransformedHead]
+  );
 
   return (
     <div className="space-y-6">
-      {/* Main Interactive Slider Card */}
+      {/* Main Interactive PCA Control & Summary Card (Cells 10, 11, 12) */}
       <div className="rounded-2xl bg-slate-900/90 border border-cyan-500/35 p-6 space-y-5 shadow-lg">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
             <Sliders className="w-5 h-5 text-cyan-400" />
             <div>
               <h2 className="text-xl font-bold text-white">
-                Number of Principal Components:{' '}
+                Selected Principal Components:{' '}
                 <span className="text-cyan-400 font-mono">{selectedK}</span> of 8
               </h2>
               <p className="text-xs text-slate-400">
-                Move the slider to see how changing the number of components affects retained variance
+                Notebook selects <span className="font-mono text-emerald-300">n = 6</span> components to retain ≥95% variance (97.31%)
               </p>
             </div>
           </div>
@@ -120,100 +104,133 @@ export const PCASimulatorSection: React.FC<PCASimulatorSectionProps> = ({
             className="w-full accent-cyan-400 cursor-pointer h-2"
           />
           <div className="flex justify-between text-xs font-mono text-slate-400">
-            <span>1 PC (28.0% variance)</span>
+            <span>1 PC (28.02%)</span>
             <span className="text-emerald-400 font-semibold">
-              ★ 6 PCs = 97.31% Variance (Notebook ≥95% Target)
+              ★ 6 PCs = 97.31% Variance Retained (Notebook Default)
             </span>
-            <span>8 PCs (100% variance)</span>
+            <span>8 PCs (100.00%)</span>
           </div>
         </div>
 
-        {/* 3 Simple, High-Impact KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+        {/* 4 Summary Cards matching Cells 10 & 12 outputs */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 pt-1">
+          <div className="rounded-xl bg-slate-950/90 border border-slate-800 p-4">
+            <div className="text-xs text-slate-400">Original → Selected Features</div>
+            <div className="text-2xl font-bold font-mono text-white mt-1">
+              8 → <span className="text-cyan-400">{selectedK}</span>
+            </div>
+            <div className="text-xs text-slate-500 mt-1">
+              Dimensions Reduced: {dimsReduced} ({dimRedPct.toFixed(1)}%)
+            </div>
+          </div>
+
           <div className="rounded-xl bg-slate-950/90 border border-cyan-500/30 p-4">
-            <div className="text-xs text-slate-400">Total Explained Variance Retained</div>
-            <div className="text-3xl font-bold font-mono text-cyan-300 mt-1">
+            <div className="text-xs text-slate-400">Variance Retained</div>
+            <div className="text-2xl font-bold font-mono text-cyan-300 mt-1">
               {retainedPct.toFixed(2)}%
             </div>
             <div className="text-xs text-slate-500 mt-1">
-              {retainedPct >= 95 ? 'Passes 95% threshold' : 'Below 95% threshold'}
+              {retainedPct >= 95 ? 'Meets ≥95% target' : 'Below 95% target'}
             </div>
           </div>
 
-          <div className="rounded-xl bg-slate-950/90 border border-rose-500/30 p-4">
-            <div className="text-xs text-slate-400">Information Lost</div>
-            <div className="text-3xl font-bold font-mono text-rose-300 mt-1">
-              {lostPct.toFixed(2)}%
+          <div className="rounded-xl bg-slate-950/90 border border-slate-800 p-4">
+            <div className="text-xs text-slate-400">Before PCA Shape</div>
+            <div className="text-2xl font-bold font-mono text-slate-200 mt-1">
+              ({pipeline.trainCount}, 8)
             </div>
-            <div className="text-xs text-slate-500 mt-1">
-              {8 - selectedK} component{8 - selectedK === 1 ? '' : 's'} dropped
-            </div>
+            <div className="text-xs text-slate-500 mt-1">X_train_scaled.shape</div>
           </div>
 
           <div className="rounded-xl bg-slate-950/90 border border-purple-500/30 p-4">
-            <div className="text-xs text-slate-400">Dimensionality Reduction</div>
-            <div className="text-3xl font-bold font-mono text-purple-300 mt-1">
-              {dimRedPct.toFixed(1)}%
+            <div className="text-xs text-slate-400">After PCA Shape</div>
+            <div className="text-2xl font-bold font-mono text-purple-300 mt-1">
+              ({pipeline.trainCount}, {selectedK})
             </div>
-            <div className="text-xs text-slate-500 mt-1">
-              Compressed from 8 → {selectedK} features
-            </div>
+            <div className="text-xs text-slate-500 mt-1">X_train_pca.shape</div>
           </div>
         </div>
       </div>
 
-      {/* Row 1: Explained Variance Bar Chart & Cumulative Curve */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="rounded-2xl bg-slate-900/80 border border-slate-800 p-6 space-y-4">
-          <div>
-            <h3 className="text-base font-bold text-white">
-              1. Variance Explained by Each Component
-            </h3>
-            <p className="text-xs text-slate-400">
-              Cyan bars are kept (PC1–PC{selectedK}); gray bars are dropped
-            </p>
+      {/* Row 1: Variance Table (Cell 8) & Cumulative Explained Variance Chart (Cell 9) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Cell 8: variance_table */}
+        <div className="lg:col-span-5 rounded-2xl bg-slate-900/80 border border-slate-800 p-6 space-y-4">
+          <div className="flex items-center gap-2.5">
+            <Table2 className="w-5 h-5 text-cyan-400" />
+            <div>
+              <h3 className="text-base font-bold text-white">
+                1. PCA Explained Variance Table
+              </h3>
+              <p className="text-xs text-slate-400">
+                Exact <span className="font-mono text-cyan-300">variance_table</span> output for PC1–PC8
+              </p>
+            </div>
           </div>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={varianceChartData} margin={{ top: 10, right: 10, left: -10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="pc" tick={{ fill: '#cbd5e1', fontSize: 12 }} />
-                <YAxis unit="%" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#0f172a',
-                    borderColor: '#334155',
-                    borderRadius: '0.75rem',
-                    fontSize: '12px',
-                  }}
-                />
-                <Bar dataKey="individualPct" name="Variance (%)" radius={[6, 6, 0, 0]}>
-                  {varianceChartData.map((entry, idx) => (
-                    <Cell
-                      key={`cell-${idx}`}
-                      fill={entry.isRetained ? '#06b6d4' : '#334155'}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs font-mono border-collapse">
+              <thead>
+                <tr className="border-b border-slate-800 text-slate-400">
+                  <th className="py-2 px-3 text-left font-sans">Principal Component</th>
+                  <th className="py-2 px-3 text-right">Explained (%)</th>
+                  <th className="py-2 px-3 text-right">Cumulative (%)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {varianceTableData.map((row) => (
+                  <tr
+                    key={row.pc}
+                    className={`border-b border-slate-800/60 ${
+                      row.pcNum === selectedK
+                        ? 'bg-cyan-500/15 font-bold'
+                        : row.isRetained
+                        ? 'hover:bg-slate-800/40'
+                        : 'opacity-50'
+                    }`}
+                  >
+                    <td className="py-2 px-3 font-sans flex items-center gap-2">
+                      <span
+                        className={`w-2 h-2 rounded-full ${
+                          row.isRetained ? 'bg-cyan-400' : 'bg-slate-600'
+                        }`}
+                      />
+                      <span className="text-slate-100">{row.pc}</span>
+                      {row.pcNum === 6 && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono">
+                          ≥95%
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2 px-3 text-right text-cyan-300">
+                      {row.individualPct.toFixed(2)}%
+                    </td>
+                    <td className="py-2 px-3 text-right text-purple-300">
+                      {row.cumulativePct.toFixed(2)}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 
-        <div className="rounded-2xl bg-slate-900/80 border border-slate-800 p-6 space-y-4">
+        {/* Cell 9: PCA - Cumulative Explained Variance Plot */}
+        <div className="lg:col-span-7 rounded-2xl bg-slate-900/80 border border-slate-800 p-6 flex flex-col justify-between space-y-4">
           <div>
             <h3 className="text-base font-bold text-white">
-              2. Cumulative Variance Curve (95% Target Line)
+              2. PCA — Cumulative Explained Variance Curve
             </h3>
             <p className="text-xs text-slate-400">
-              Reaches 97.31% at 6 Principal Components (crossing the green 95% line)
+              Cumulative variance across 1–8 components with the dashed <span className="text-rose-400 font-semibold">95% Variance</span> threshold line
             </p>
           </div>
-          <div className="h-64">
+
+          <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart
-                data={varianceChartData}
-                margin={{ top: 10, right: 20, left: -10, bottom: 5 }}
+                data={varianceTableData}
+                margin={{ top: 15, right: 20, left: -10, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                 <XAxis dataKey="pc" tick={{ fill: '#cbd5e1', fontSize: 12 }} />
@@ -228,22 +245,35 @@ export const PCASimulatorSection: React.FC<PCASimulatorSectionProps> = ({
                 />
                 <ReferenceLine
                   y={95}
-                  stroke="#10b981"
+                  stroke="#f43f5e"
                   strokeDasharray="5 5"
                   label={{
-                    value: '95% Threshold',
-                    fill: '#10b981',
+                    value: '95% Variance',
+                    fill: '#f43f5e',
                     fontSize: 11,
                     position: 'insideBottomRight',
                   }}
                 />
+                <Bar
+                  dataKey="individualPct"
+                  name="Individual Explained Variance (%)"
+                  radius={[5, 5, 0, 0]}
+                >
+                  {varianceTableData.map((entry, idx) => (
+                    <Cell
+                      key={`cell-${idx}`}
+                      fill={entry.isRetained ? '#06b6d4' : '#334155'}
+                      fillOpacity={0.55}
+                    />
+                  ))}
+                </Bar>
                 <Line
                   type="monotone"
                   dataKey="cumulativePct"
                   name="Cumulative Variance (%)"
-                  stroke="#a855f7"
+                  stroke="#38bdf8"
                   strokeWidth={3}
-                  dot={{ r: 5, fill: '#a855f7' }}
+                  dot={{ r: 5, fill: '#38bdf8' }}
                 />
               </ComposedChart>
             </ResponsiveContainer>
@@ -251,102 +281,161 @@ export const PCASimulatorSection: React.FC<PCASimulatorSectionProps> = ({
         </div>
       </div>
 
-      {/* Row 2: How All 8 Features Contribute + 2D PCA Scatter */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="rounded-2xl bg-slate-900/80 border border-slate-800 p-6 space-y-4">
+      {/* Row 2: PCA Component Coefficients Table (Cell 13) */}
+      <div className="rounded-2xl bg-slate-900/80 border border-slate-800 p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <Layers className="w-5 h-5 text-cyan-400" />
+            <div>
+              <h3 className="text-base font-bold text-white">
+                3. PCA Component Coefficients (<span className="font-mono text-cyan-300">pca_selected.components_</span>)
+              </h3>
+              <p className="text-xs text-slate-400">
+                Feature loadings showing how each of the 8 standardized ingredients is weighted inside PC1 through PC{selectedK}
+              </p>
+            </div>
+          </div>
+          <span className="text-xs font-mono text-slate-400">
+            Rounded to 3 decimal places
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs font-mono border-collapse">
+            <thead>
+              <tr className="border-b border-slate-800 text-slate-400">
+                <th className="py-2.5 px-3 text-left font-sans">Component</th>
+                {pipeline.featureMeta.map((f) => (
+                  <th key={f.key} className="py-2.5 px-2.5 text-right font-sans">
+                    {f.shortName}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {selectedComponents.map((compVec, pcIdx) => (
+                <tr
+                  key={pcIdx}
+                  className="border-b border-slate-800/60 hover:bg-slate-800/40"
+                >
+                  <td className="py-2.5 px-3 font-bold text-cyan-300">PC{pcIdx + 1}</td>
+                  {compVec.map((weight, featIdx) => {
+                    const rounded = Number(weight.toFixed(3));
+                    const isStrongPos = rounded >= 0.3;
+                    const isStrongNeg = rounded <= -0.3;
+                    return (
+                      <td key={featIdx} className="py-2.5 px-2.5 text-right">
+                        <span
+                          className={`px-2 py-0.5 rounded ${
+                            isStrongPos
+                              ? 'bg-emerald-500/20 text-emerald-300 font-semibold'
+                              : isStrongNeg
+                              ? 'bg-rose-500/20 text-rose-300 font-semibold'
+                              : 'text-slate-300'
+                          }`}
+                        >
+                          {rounded >= 0 ? '+' : ''}
+                          {rounded.toFixed(3)}
+                        </span>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Row 3: Explicit PCA Mathematical Equations (Cell 14) */}
+      <div className="rounded-2xl bg-slate-900/80 border border-slate-800 p-6 space-y-4">
+        <div className="flex items-center gap-2.5">
+          <Sigma className="w-5 h-5 text-purple-400" />
           <div>
             <h3 className="text-base font-bold text-white">
-              3. Original Ingredients vs. Selected PCs (k = {selectedK})
+              4. PCA Mathematical Equations (PC1 – PC{selectedK})
             </h3>
-            <p className="text-xs text-slate-300 flex items-center gap-1.5 mt-1">
-              <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0" />
-              <span>
-                PCA does <strong>not</strong> delete features—it combines all 8 normalized
-                ingredients into each component.
-              </span>
+            <p className="text-xs text-slate-400">
+              Linear combination equations printed in the Colab notebook for each Principal Component
             </p>
-          </div>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={weightedContributions}
-                layout="vertical"
-                margin={{ top: 5, right: 20, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis type="number" unit="%" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  width={95}
-                  tick={{ fill: '#e2e8f0', fontSize: 12 }}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#0f172a',
-                    borderColor: '#334155',
-                    borderRadius: '0.75rem',
-                    fontSize: '12px',
-                  }}
-                />
-                <Bar
-                  dataKey="sharePct"
-                  name="Share of Retained Variance (%)"
-                  fill="#06b6d4"
-                  radius={[0, 6, 6, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
           </div>
         </div>
 
-        <div className="rounded-2xl bg-slate-900/80 border border-slate-800 p-6 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div className="space-y-2.5">
+          {selectedComponents.map((compVec, pcIdx) => (
+            <div
+              key={pcIdx}
+              className="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800/90 font-mono text-xs leading-relaxed overflow-x-auto"
+            >
+              <span className="text-cyan-400 font-bold mr-2">PC{pcIdx + 1} =</span>
+              {compVec.map((weight, featIdx) => {
+                const featName = pipeline.featureMeta[featIdx].shortName;
+                const wStr = weight.toFixed(3);
+                return (
+                  <React.Fragment key={featIdx}>
+                    <span className="text-slate-300">
+                      (<span className={weight >= 0 ? 'text-emerald-300' : 'text-rose-300'}>{wStr}</span>
+                      {' × '}
+                      <span className="text-white">{featName}</span>)
+                    </span>
+                    {featIdx < compVec.length - 1 && (
+                      <span className="text-slate-500 mx-1.5">+</span>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Row 4: PCA Transformed Dataset Preview (pca_df.head(), Cell 15) */}
+      <div className="rounded-2xl bg-slate-900/80 border border-slate-800 p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <Table2 className="w-5 h-5 text-emerald-400" />
             <div>
               <h3 className="text-base font-bold text-white">
-                4. 2D PCA Projection (PC1 vs. PC2)
+                5. PCA Transformed Dataset Preview (<span className="font-mono text-emerald-300">pca_df.head()</span>)
               </h3>
               <p className="text-xs text-slate-400">
-                Data points colored by Concrete Strength (MPa)
+                First 5 standardized training samples projected onto PC1 through PC{selectedK}
               </p>
             </div>
-            <div className="flex items-center gap-2.5 text-[11px] font-mono">
-              <span className="text-amber-400">● &lt;25 MPa</span>
-              <span className="text-cyan-400">● 25–45 MPa</span>
-              <span className="text-purple-400">● &gt;45 MPa</span>
-            </div>
           </div>
+          <span className="text-xs font-mono text-slate-400">
+            Shape: ({pipeline.trainCount}, {selectedK})
+          </span>
+        </div>
 
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <ScatterChart margin={{ top: 10, right: 10, left: -15, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis
-                  type="number"
-                  dataKey="pc1"
-                  name="PC1"
-                  tick={{ fill: '#94a3b8', fontSize: 11 }}
-                />
-                <YAxis
-                  type="number"
-                  dataKey="pc2"
-                  name="PC2"
-                  tick={{ fill: '#94a3b8', fontSize: 11 }}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#0f172a',
-                    borderColor: '#334155',
-                    borderRadius: '0.75rem',
-                    fontSize: '12px',
-                  }}
-                />
-                <Scatter name="Low (<25 MPa)" data={scatterBuckets.low} fill="#f59e0b" opacity={0.7} />
-                <Scatter name="Medium (25-45 MPa)" data={scatterBuckets.mid} fill="#06b6d4" opacity={0.7} />
-                <Scatter name="High (>45 MPa)" data={scatterBuckets.high} fill="#a855f7" opacity={0.85} />
-              </ScatterChart>
-            </ResponsiveContainer>
-          </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs font-mono border-collapse">
+            <thead>
+              <tr className="border-b border-slate-800 text-slate-400">
+                <th className="py-2.5 px-3 text-left font-sans">Sample Index</th>
+                {Array.from({ length: selectedK }, (_, i) => (
+                  <th key={i} className="py-2.5 px-3 text-right text-cyan-300">
+                    PC{i + 1}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {pcaHeadRows.map((pcRow, rIdx) => (
+                <tr
+                  key={rIdx}
+                  className="border-b border-slate-800/60 hover:bg-slate-800/40"
+                >
+                  <td className="py-2.5 px-3 text-slate-400 font-bold">Row {rIdx}</td>
+                  {pcRow.slice(0, selectedK).map((val, cIdx) => (
+                    <td key={cIdx} className="py-2.5 px-3 text-right text-slate-200">
+                      {val.toFixed(6)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
